@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+from preprocess import load_data, _input_fn
 
 import tensorflow as tf
 
@@ -17,12 +18,6 @@ _TRAIN="TRAIN"
 
 def parse_args():
   parser = argparse.ArgumentParser()
-
-  parser.add_argument(
-    '--mode',
-    help='Either `train` or `predict`',
-    default=_TRAIN
-  )
 
   parser.add_argument(
     '--job-dir',
@@ -84,17 +79,68 @@ def parse_args():
     default=20,
   )
 
+  ### Model HParams
+  parser.add_argument(
+    '--learning_rate',
+    type=float,
+  )
+  parser.add_argument(
+    '--decay_rate',
+    type=float,
+  )
+  parser.add_argument(
+    '--samples',
+    type=int,
+  )
+  parser.add_argument(
+    '--hidden_units',
+    nargs='+',
+    type=int,
+  )
+  parser.add_argument(
+    '--dropouts',
+    type=float,
+  )
+  parser.add_argument(
+    '--activation',
+    type=str,
+  )
+  parser.add_argument(
+    '--type',
+    type=str,
+  )
+
   args, _ = parser.parse_known_args()
 
   return args
 
 
+def set_up_logging():
+  """Sets up logging."""
+
+  # Check for environmental variable.
+  file_location = os.getenv('JOB_DIRECTORY', '.')
+
+  print("Logging file writing to {}".format(file_location), flush=True)
+
+  logging.basicConfig(
+    filename=os.path.join(file_location, 'training.log'),
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(processName)s - %(process)d - %(message)s'
+  )
+
+  logging.debug("Initialize debug.")
+
 def main():
 
   args = parse_args()
 
-  logging_utils.set_up_logging()
-  train_input, eval_input, test_input = model.input_fns()
+  set_up_logging()
+
+  (x_train, y_train),(x_test, y_test) = load_data()
+
+  train_input = lambda: _input_fn(x_train, y_train, args.batch_size, shuffle=True)
+  eval_input = lambda: _input_fn(x_test, y_test, args.batch_size, shuffle=False)
 
   hparams = model.make_hparams()
   hparams.parse(args.hparams)
@@ -120,7 +166,7 @@ def main():
   )
 
   estimator = tf.estimator.Estimator(
-    model_fn=model_fn,
+    model_fn=model.model_fn,
     config=run_config,
     params=hparams,
     warm_start_from=warm_start_from

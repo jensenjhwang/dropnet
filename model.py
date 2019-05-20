@@ -10,25 +10,59 @@ class FFNet(keras.Model):
         super(FFNet, self).__init__()
         self.mode= mode
         self.samples = hparams.samples
-        feed_forward = keras.models.Sequential()
-        for unit, d_prob in zip(hparams.hidden_units, hparams.dropouts):
-            feed_forward.add(keras.layers.Dense(units=unit,activation=hparams.activation))
-            if mode == tf.estimator.ModeKeys.TRAIN and hparams.type == NORMAL:
-                feed_forward.add(keras.layers.Dropout(d_prob))
-        feed_forward.add(keras.layers.Dense(units=hparams.classes, activation=hparams.activation))
-        self.feed_forward = feed_forward
+        self.type = hparams.type
+
+        self.feed_forward = []
+        for unit in hparams.hidden_units:
+            self.feed_forward.append(keras.layers.Dense(units=unit,activation=hparams.activation))
+
+        self.dropouts = []
+        for d_prob in hparams.dropouts:
+            self.dropouts.append(keras.layers.Dropout(rate=d_prob))
+
+        self.postprocess = keras.layers.Dense(units=hparams.classes, activation=hparams.activation)
+
+        # feed_forward = keras.models.Sequential()
+        # training = (mode == tf.estimator.ModeKeys.TRAIN) or hparams.type == SAMPLE
+        # for unit, d_prob in zip(hparams.hidden_units, hparams.dropouts):
+        #     feed_forward.add(keras.layers.Dense(units=unit,activation=hparams.activation))
+        #     feed_forward.add(tf.layers.dropout())
+        #     # if mode == tf.estimator.ModeKeys.TRAIN or hparams.type == SAMPLE:
+        #     #     feed_forward.add(keras.layers.Dropout(d_prob))
+        # feed_forward.add(keras.layers.Dense(units=hparams.classes, activation=hparams.activation))
+        # self.feed_forward = feed_forward
+
+    def predict(self, inputs, training):
+        result = inputs
+        for unit, dropout in zip(self.feed_forward, self.dropouts):
+            result = dropout(unit(result), training=training)
+        result = self.postprocess(result)
+        return result
 
     def call(self, inputs):
-        if self.mode == tf.estimator.ModeKeys.TRAIN or hparams.type == NORMAL:
-            logits = self.feed_forward(inputs)
+
+        if self.mode == tf.estimator.ModeKeys.TRAIN or self.type == NORMAL:
+            logits = self.predict(inputs, self.mode==tf.estimator.ModeKeys.TRAIN)
             return logits
         else:
             outputs = []
-            for _ in hparams.samples:
-                logits = self.feed_forward(inputs)
+            for _ in range(self.samples):
+                logits = self.predict(inputs, True)
                 outputs.append(logits)
-            combined = outputs.concat(outputs, axis=-1)
+            combined = tf.stack(outputs, axis=-1)
             return combined
+
+        # if self.mode == tf.estimator.ModeKeys.TRAIN or self.type == NORMAL:
+        #     logits = self.feed_forward(inputs)
+        #     return logits
+        # else:
+        #
+        #     outputs = []
+        #     for _ in range(self.samples):
+        #         logits = self.feed_forward(inputs)
+        #         outputs.append(logits)
+        #     combined = tf.stack(outputs, axis=-1)
+        #     return combined
 
     @classmethod
     def get_tiny_hparams(cls):
@@ -56,7 +90,7 @@ class FFNet(keras.Model):
 
 def make_hparams() -> tf.contrib.training.HParams:
   """Create a HParams object specifying model hyperparameters."""
-  hparams = EncoderDecoder.get_base_hparams()
+  hparams = FFNet.get_base_hparams()
   hparams.add_hparam("learning_rate", 0.001)
   hparams.add_hparam("decay_step", 500)
   hparams.add_hparam("decay_rate", 0.9)
@@ -78,6 +112,8 @@ def model_fn(features, labels, mode, params):
   training_hooks = []
   eval_hooks = []
 
+  features = tf.reshape(features, [tf.shape(features)[0], features.shape[1]*features.shape[2]])
+
   model = FFNet(mode, params)
 
   if mode == tf.estimator.ModeKeys.EVAL:
@@ -92,15 +128,17 @@ def model_fn(features, labels, mode, params):
       mean_std = tf.math.reduce_mean(tf.math.reduce_std(predictions, axis=-1))
       std_hook = tf.train.LoggingTensorHook(
         tensors={"mean_std": mean_std},
-        every_n_iter=1
+        every_n_iter=100
       )
       eval_hooks.append(std_hook)
       with tf.variable_scope("metrics"):
           eval_metric_ops = {
             "norm_accuracy": tf.metrics.accuracy(
-                labels=labels, predictions=tf.argmax(input=logits_norm, axis=-1)),
+                labels=tf.argmax(labels, axis=-1),
+                predictions=tf.argmax(input=logits_norm, axis=-1)),
             "sample_accuracy": tf.metrics.accuracy(
-                labels=labels, predictions=tf.argmax(input=logits_sample, axis=-1))
+                labels=tf.argmax(labels, axis=-1),
+                predictions=tf.argmax(input=logits_sample, axis=-1))
           }
 
       model.type = params.type
@@ -113,13 +151,28 @@ def model_fn(features, labels, mode, params):
 
           if model.type == NORMAL:
               loss = loss_norm
+              logits = logits_norm
           else:
               loss = loss_sample
+              logits = logits_sample
 
-  else:
-      logits = model(features)
-      loss = tf.losses.softmax_cross_entropy(onehot_labels=labels, logits=logits)
-      tf.summary.scalar("cross_entropy_loss", loss)
+          loss_hook = tf.train.LoggingTensorHook(
+            tensors={"CE_loss": loss},
+            every_n_iter=100
+          )
+          eval_hooks.append(loss_hook)
+
+      return tf.estimator.EstimatorSpec(
+        mode=mode,
+        loss=loss,
+        predictions=logits,
+        eval_metric_ops=eval_metric_ops,
+        evaluation_hooks=eval_hooks,
+      )
+
+  logits = model(features)
+  loss = tf.losses.softmax_cross_entropy(onehot_labels=labels, logits=logits)
+  tf.summary.scalar("cross_entropy_loss", loss)
 
   with tf.variable_scope("optimizer"):
     learning_rate = tf.train.exponential_decay(
@@ -138,8 +191,6 @@ def model_fn(features, labels, mode, params):
     mode=mode,
     loss=loss,
     train_op=train_op,
-    predictions=predictions,
-    eval_metric_ops=eval_metric_ops,
+    predictions=logits,
     training_hooks=training_hooks,
-    evaluation_hooks=eval_hooks,
   )
