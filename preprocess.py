@@ -15,7 +15,7 @@ def load_data(one_hot=True):
 	return (x_train, y_train),(x_test, y_test)
 
 # Features and labels are tensors with equal first dims
-def _input_fn(features, labels, batch_size, shuffle):
+def _input_fn(features, labels, batch_size, shuffle, epochs=1):
 	features = tf.cast(features,tf.float32)
 	labels = tf.cast(labels,tf.int32)
 
@@ -27,6 +27,7 @@ def _input_fn(features, labels, batch_size, shuffle):
 		dataset = dataset.shuffle(1000)
 
 	dataset = dataset.batch(batch_size)
+	dataset = dataset.repeat(epochs)
 
 	dataset_iterator = dataset.make_one_shot_iterator()
 

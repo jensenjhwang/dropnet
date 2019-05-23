@@ -8,6 +8,6 @@ python3 train.py \
     --job-dir="output_${NOW}" \
     --train_steps=1000 \
     --batch_size=16 \
-    --hparams="hidden_units=[100, 100, 100],
-      dropouts=[0.5, 0.5, 0.5],
+    --hparams="hidden_units=[128, 128, 128, 128],
+      dropouts=[0.5, 0.5, 0.5, 0.5],
       samples=100"
