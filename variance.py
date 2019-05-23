@@ -51,16 +51,16 @@ def get_preds(params, K):
 				print('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
 
 		# Test
-		model.mode = tf.estimator.ModeKeys.EVAL
-		logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
-		acc, acc_op = tf.metrics.accuracy(labels=tf.argmax(y_test, axis=-1),
-			predictions=tf.argmax(logits_test, axis=-1))
-		sess.run(tf.global_variables_initializer())
-		sess.run(tf.local_variables_initializer())
-		preds, _, _ = sess.run([logits_test, acc, acc_op])
-		accuracies.append(sess.run(acc))
-		predictions.append(preds)
-		print('Test accuracy: {}'.format(accuracies[-1]))
+				model.mode = tf.estimator.ModeKeys.EVAL
+				logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
+				acc, acc_op = tf.metrics.accuracy(labels=tf.argmax(y_test, axis=-1),
+					predictions=tf.argmax(logits_test, axis=-1))
+				sess.run(tf.global_variables_initializer())
+				sess.run(tf.local_variables_initializer())
+				preds, _, _ = sess.run([logits_test, acc, acc_op])
+				accuracies.append(sess.run(acc))
+				predictions.append(preds)
+				print('Test accuracy: {}'.format(accuracies[-1]))
 	return predictions, accuracies
 
 preds = get_preds(make_hparams(), 10)
