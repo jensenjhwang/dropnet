@@ -122,7 +122,7 @@ def parse_args():
   return args
 
 
-def set_up_logging():
+def set_up_logging(fname=None):
   """Sets up logging."""
 
   # Check for environmental variable.
@@ -130,8 +130,10 @@ def set_up_logging():
 
   print("Logging file writing to {}".format(file_location), flush=True)
 
+  if fname == None:
+    fname = os.path.join(file_location, 'training.log')
   logging.basicConfig(
-    filename=os.path.join(file_location, 'training.log'),
+    filename=fname,
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(processName)s - %(process)d - %(message)s'
   )
