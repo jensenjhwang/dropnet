@@ -78,6 +78,8 @@ def main():
 	hparams = make_hparams()
 	hparams.parse(args.hparams)
 	NUM_EPOCHS = args.train_steps
+	print('Hparams are {}'.format(args.hparams))
+	log.info('Hparams are {}'.format(args.hparams))
 	getVariance(hparams, args.num_splits)
 
 if __name__ == "__main__":
