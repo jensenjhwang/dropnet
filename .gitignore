@@ -1,5 +1,6 @@
 __pycache__/
 trainer/__pycache__/
 variance/__pycache__/
-output*
+test_output/
+*output*
 training.log
