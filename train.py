@@ -79,6 +79,13 @@ def parse_args():
     default=200,
   )
 
+  parser.add_argument(
+    '--num_splits',
+    type=int,
+    default=10
+  )
+  parser.add_argument{}
+
   ### Model HParams
   parser.add_argument(
     '--learning_rate',
@@ -99,6 +106,7 @@ def parse_args():
   )
   parser.add_argument(
     '--dropouts',
+    nargs='+',
     type=float,
   )
   parser.add_argument(
