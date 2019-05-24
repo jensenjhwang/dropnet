@@ -66,6 +66,7 @@ def get_preds(params, K, sample):
 		predictions.append(logits_value)
 		print('Test accuracy: {}'.format(acc))
 		logging.info('Test accuracy: {}'.format(acc))
+		accuracies = np.array(accuracies)
 	return predictions, accuracies
 
 def getVariance(params=make_hparams(), K=10):
@@ -75,8 +76,11 @@ def getVariance(params=make_hparams(), K=10):
 		preds, accs = get_preds(params, K, sample)
 		preds = np.stack(preds, axis=-1)
 		var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
+		acc = np.mean(accs)
 		print('Variance is {}'.format(var))
 		logging.info('Variance is {}'.format(var))
+		print('Average accuracy is {}'.format(acc))
+		logging.info('Average accuracy is {}'.format(acc))
 
 def main():
 	args = parse_args()
