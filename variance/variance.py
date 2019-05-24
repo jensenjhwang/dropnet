@@ -17,6 +17,7 @@ def get_preds(params, K, sample):
 	(x_train, y_train),(x_test, y_test) = tf.keras.datasets.mnist.load_data()
 	predictions = []
 	accuracies = []
+	losses = []
 	x_train = np.reshape(x_train, (x_train.shape[0], -1))
 	x_test = tf.convert_to_tensor(np.reshape(x_test, (x_test.shape[0], -1)), dtype=tf.float32)
 
@@ -48,9 +49,9 @@ def get_preds(params, K, sample):
 				total_loss += np.sum(loss_value)
 				accuracy += acc_value / num_batches
 
-			if j % PRINT_EVERY == 0:
-				logging.info('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
-				print('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
+			# if j % PRINT_EVERY == 0:
+				# logging.info('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
+				# rint('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
 
 		# Test
 		if sample:
@@ -59,28 +60,32 @@ def get_preds(params, K, sample):
 		else:
 			logits_test = model.call(x_test)
 
-		logits_value = sess.run(logits_test)
+		y_t = tf.one_hot(tf.convert_to_tensor(y_test), 10)
+		loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits_test, labels=y_t)
+		logits_value, loss_value = sess.run([logits_test, loss])
 		preds = np.argmax(logits_value, axis=-1)
 		acc = np.mean(preds == y_test)
 		accuracies.append(acc)
 		predictions.append(logits_value)
-		print('Test accuracy: {}'.format(acc))
-		logging.info('Test accuracy: {}'.format(acc))
-		accuracies = np.array(accuracies)
-	return predictions, accuracies
+		losses.append(loss_value)
+		# print('Test accuracy: {}'.format(acc))
+		# logging.info('Test accuracy: {}'.format(acc))
+	return np.stack(predictions, axis=-1), np.array(accuracies), np.array(losses)
 
 def getVariance(params=make_hparams(), K=10):
 	for sample in [True, False]:
-		print('Using sample: {}'.format(sample))
-		logging.info('Using sample: {}'.format(sample))
-		preds, accs = get_preds(params, K, sample)
-		preds = np.stack(preds, axis=-1)
+		# print('Using sample: {}'.format(sample))
+		# logging.info('Using sample: {}'.format(sample))
+		preds, accs, losses = get_preds(params, K, sample)
 		var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
 		acc = np.mean(accs)
+		loss = np.mean(losses)
 		print('Variance is {}'.format(var))
 		logging.info('Variance is {}'.format(var))
 		print('Average accuracy is {}'.format(acc))
 		logging.info('Average accuracy is {}'.format(acc))
+		print('Average loss is {}'.format(loss))
+		logging.info('Average loss is {}'.format(loss))
 
 def main():
 	args = parse_args()

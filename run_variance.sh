@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OUTPUT_PATH=$PWD"/test_output/*"
+OUTPUT_PATH=$PWD"/test_output/"
 NOW=$(date '+%d_%m_%Y_%H_%M_%S')
 
 # python command
@@ -12,4 +12,5 @@ python3 -m variance.variance \
       dropouts=[0.2, 0.2, 0.2],
       samples=30,
       drop_type=INVERTED,
-      activation=tanh"
+      activation=tanh" \
+    --num_splits=2
