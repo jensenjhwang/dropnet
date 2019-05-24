@@ -38,7 +38,7 @@ def get_preds(params, K):
 
 		sess.run(tf.global_variables_initializer())
 		sess.run(tf.local_variables_initializer())
-		for j in range(params.train_steps):
+		for j in range(NUM_EPOCHS):
 			total_loss = 0
 			accuracy = 0
 			num_batches = SAMPLE_SIZE // BATCH_SIZE
@@ -77,6 +77,7 @@ def main():
 	set_up_logging()
 	hparams = make_hparams()
 	hparams.parse(args.hparams)
+	NUM_EPOCHS = args.train_steps
 	getVariance(hparams, args.num_splits)
 
 if __name__ == "__main__":
