@@ -84,7 +84,7 @@ def getVariance(params=make_hparams(), K=10):
 
 def main():
 	args = parse_args()
-	set_up_logging(args.job-dir)
+	set_up_logging(args.job_dir)
 	hparams = make_hparams()
 	hparams.parse(args.hparams)
 	NUM_EPOCHS = args.train_steps
