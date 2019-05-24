@@ -84,7 +84,6 @@ def parse_args():
     type=int,
     default=10
   )
-  parser.add_argument{}
 
   ### Model HParams
   parser.add_argument(
