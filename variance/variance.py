@@ -11,7 +11,7 @@ BATCH_SIZE = 16
 NUM_EPOCHS = 5
 PRINT_EVERY = 1
 
-def get_preds(params, K):
+def get_preds(params, K, sample):
 	""" TODO: COMMENT
 	"""
 	(x_train, y_train),(x_test, y_test) = tf.keras.datasets.mnist.load_data()
@@ -53,8 +53,11 @@ def get_preds(params, K):
 				print('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
 
 		# Test
-		model.mode = tf.estimator.ModeKeys.EVAL
-		logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
+		if sample:
+			model.mode = tf.estimator.ModeKeys.EVAL
+			logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
+		else:
+			logits_test = model.call(x_test)
 
 		logits_value = sess.run(logits_test)
 		preds = np.argmax(logits_value, axis=-1)
@@ -66,11 +69,14 @@ def get_preds(params, K):
 	return predictions, accuracies
 
 def getVariance(params=make_hparams(), K=10):
-	preds, accs = get_preds(params, K)
-	preds = np.stack(preds, axis=-1)
-	var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
-	print('Variance is {}'.format(var))
-	logging.info('Variance is {}'.format(var))
+	for sample in [True, False]:
+		print('Using sample: {}'.format(sample))
+		log.info('Using sample: {}'.format(sample))
+		preds, accs = get_preds(params, K, sample)
+		preds = np.stack(preds, axis=-1)
+		var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
+		print('Variance is {}'.format(var))
+		logging.info('Variance is {}'.format(var))
 
 def main():
 	args = parse_args()
