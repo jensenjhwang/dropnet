@@ -1,0 +1,5 @@
+__pycache__/
+trainer/__pycache__/
+variance/__pycache__/
+output*
+training.log
