@@ -79,6 +79,12 @@ def parse_args():
     default=20,
   )
 
+  parser.add_argument(
+    '--num_splits',
+    type=int,
+    default=10,
+  )
+
   ### Model HParams
   parser.add_argument(
     '--learning_rate',

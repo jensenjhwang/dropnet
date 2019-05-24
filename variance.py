@@ -3,10 +3,12 @@ import tensorflow.keras as keras
 import numpy as np
 from model import FFNet, make_hparams
 from preprocess import load_data, _input_fn
+from train import parse_args, set_up_logging
+import logging
 
 SAMPLE_SIZE = 10000
 BATCH_SIZE = 16
-NUM_EPOCHS = 1
+NUM_EPOCHS = 5
 PRINT_EVERY = 1
 
 def get_preds(params, K):
@@ -20,7 +22,6 @@ def get_preds(params, K):
 
 	sess = tf.Session()
 
-	# y_test = tf.one_hot(tf.convert_to_tensor(y_test, dtype=tf.int32), 10)
 	for i in range(K):
 		idx = np.random.choice(len(x_train), SAMPLE_SIZE)
 		x = tf.convert_to_tensor(x_train[idx], dtype=tf.float32)
@@ -37,7 +38,7 @@ def get_preds(params, K):
 
 		sess.run(tf.global_variables_initializer())
 		sess.run(tf.local_variables_initializer())
-		for j in range(NUM_EPOCHS):
+		for j in range(params.train_steps):
 			total_loss = 0
 			accuracy = 0
 			num_batches = SAMPLE_SIZE // BATCH_SIZE
@@ -48,6 +49,7 @@ def get_preds(params, K):
 				accuracy += acc_value / num_batches
 
 			if j % PRINT_EVERY == 0:
+				logging.info('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
 				print('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
 
 		# Test
@@ -60,12 +62,22 @@ def get_preds(params, K):
 		accuracies.append(acc)
 		predictions.append(logits_value)
 		print('Test accuracy: {}'.format(acc))
+		logging.info('Test accuracy: {}'.format(acc))
 	return predictions, accuracies
 
-def getVariance(K):
-	preds, accs = get_preds(make_hparams(), K)
+def getVariance(params=make_hparams(), K=10):
+	preds, accs = get_preds(params, K)
 	preds = np.stack(preds, axis=-1)
 	var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
 	print('Variance is {}'.format(var))
+	logging.info('Variance is {}'.format(var))
 
-getVariance(10)
+def main():
+	args = parse_args()
+	set_up_logging()
+	hparams = make_hparams()
+	hparams.parse(args.hparams)
+	getVariance(hparams, args.num_splits)
+
+if __name__ == "__main__":
+	main()
