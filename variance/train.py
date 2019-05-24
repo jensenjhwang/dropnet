@@ -4,14 +4,14 @@ import argparse
 import logging
 import os
 import sys
-from preprocess import load_data, _input_fn
+from trainer.preprocess import load_data, _input_fn
 
 import tensorflow as tf
 
 # Add `Dropnet` package.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import model
+import trainer.model as model
 
 _PREDICT="PREDICT"
 _TRAIN="TRAIN"
@@ -70,19 +70,13 @@ def parse_args():
   parser.add_argument(
     '--save_checkpoint_steps',
     type=int,
-    default=200,
+    default=500,
   )
 
   parser.add_argument(
     '--log_step_count',
     type=int,
-    default=20,
-  )
-
-  parser.add_argument(
-    '--num_splits',
-    type=int,
-    default=10,
+    default=200,
   )
 
   ### Model HParams
@@ -196,6 +190,7 @@ def main():
   eval_spec = tf.estimator.EvalSpec(
     input_fn=eval_input,
     steps=args.eval_steps,
+    throttle_secs=5
   )
 
   tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
