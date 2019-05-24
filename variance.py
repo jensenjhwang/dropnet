@@ -6,8 +6,8 @@ from preprocess import load_data, _input_fn
 
 SAMPLE_SIZE = 10000
 BATCH_SIZE = 16
-NUM_EPOCHS = 50
-PRINT_EVERY = 10
+NUM_EPOCHS = 10
+PRINT_EVERY = 1
 
 def get_preds(params, K):
 	""" TODO: COMMENT
@@ -20,10 +20,10 @@ def get_preds(params, K):
 
 	sess = tf.Session()
 
-	y_test = tf.one_hot(tf.convert_to_tensor(y_test, dtype=tf.int32), 10)
+	# y_test = tf.one_hot(tf.convert_to_tensor(y_test, dtype=tf.int32), 10)
 	for i in range(K):
 		idx = np.random.choice(len(x_train), SAMPLE_SIZE)
-		x = tf.convert_to_tensor(x_train[idx])
+		x = tf.convert_to_tensor(x_train[idx], dtype=tf.float32)
 		y = tf.one_hot(tf.convert_to_tensor(y_train[idx]), 10)
 		
 		# Train on x and y
@@ -51,17 +51,19 @@ def get_preds(params, K):
 				print('Epoch {}: loss = {}, accuracy = {}'.format(j, total_loss, accuracy))
 
 		# Test
-				model.mode = tf.estimator.ModeKeys.EVAL
-				logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
-				acc, acc_op = tf.metrics.accuracy(labels=tf.argmax(y_test, axis=-1),
-					predictions=tf.argmax(logits_test, axis=-1))
-				sess.run(tf.global_variables_initializer())
-				sess.run(tf.local_variables_initializer())
-				preds, _, _ = sess.run([logits_test, acc, acc_op])
-				accuracies.append(sess.run(acc))
-				predictions.append(preds)
-				print('Test accuracy: {}'.format(accuracies[-1]))
+		model.mode = tf.estimator.ModeKeys.EVAL
+		logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
+
+		preds = np.argmax(sess.run(logits_test), axis=-1)
+		acc = np.mean(preds == y_test)
+		accuracies.append(acc)
+		predictions.append(preds)
+		print('Test accuracy: {}'.format(acc))
 	return predictions, accuracies
 
-preds = get_preds(make_hparams(), 10)
-print(preds)
+def getVariance(K):
+	preds, accs = get_preds(make_hparams(), K)
+	preds = np.stack(preds, axis=-1)
+	var = np.mean((preds - np.mean(preds, axis=-1)) ** 2)
+
+getVariance(10)

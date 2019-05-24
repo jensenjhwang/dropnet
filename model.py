@@ -81,7 +81,7 @@ class FFNet(keras.Model):
         hparams = tf.contrib.training.HParams(
             samples=30,
             hidden_units=[100, 100, 100],
-            dropouts=[0.5, 0, 0],
+            dropouts=[0, 0, 0.2],
             activation='tanh',
             classes = 10,
             type=SAMPLE,
