@@ -6,7 +6,7 @@ from preprocess import load_data, _input_fn
 
 SAMPLE_SIZE = 10000
 BATCH_SIZE = 16
-NUM_EPOCHS = 10
+NUM_EPOCHS = 1
 PRINT_EVERY = 1
 
 def get_preds(params, K):
@@ -54,16 +54,18 @@ def get_preds(params, K):
 		model.mode = tf.estimator.ModeKeys.EVAL
 		logits_test = tf.math.reduce_mean(model.call(x_test), axis=-1)
 
-		preds = np.argmax(sess.run(logits_test), axis=-1)
+		logits_value = sess.run(logits_test)
+		preds = np.argmax(logits_value, axis=-1)
 		acc = np.mean(preds == y_test)
 		accuracies.append(acc)
-		predictions.append(preds)
+		predictions.append(logits_value)
 		print('Test accuracy: {}'.format(acc))
 	return predictions, accuracies
 
 def getVariance(K):
 	preds, accs = get_preds(make_hparams(), K)
 	preds = np.stack(preds, axis=-1)
-	var = np.mean((preds - np.mean(preds, axis=-1)) ** 2)
+	var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
+	print('Variance is {}'.format(var))
 
 getVariance(10)
