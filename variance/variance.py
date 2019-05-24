@@ -71,7 +71,7 @@ def get_preds(params, K, sample):
 def getVariance(params=make_hparams(), K=10):
 	for sample in [True, False]:
 		print('Using sample: {}'.format(sample))
-		log.info('Using sample: {}'.format(sample))
+		logging.info('Using sample: {}'.format(sample))
 		preds, accs = get_preds(params, K, sample)
 		preds = np.stack(preds, axis=-1)
 		var = np.mean((preds - np.mean(preds, axis=-1, keepdims=True)) ** 2)
@@ -85,7 +85,7 @@ def main():
 	hparams.parse(args.hparams)
 	NUM_EPOCHS = args.train_steps
 	print('Hparams are {}'.format(args.hparams))
-	log.info('Hparams are {}'.format(args.hparams))
+	logging.info('Hparams are {}'.format(args.hparams))
 	getVariance(hparams, args.num_splits)
 
 if __name__ == "__main__":
