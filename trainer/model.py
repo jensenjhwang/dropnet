@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras as keras
+import os
 
 NORMAL = 'normal'
 SAMPLE = 'sample'
@@ -21,13 +22,6 @@ class VanillaDropout(keras.layers.Layer):
             mask = tf.cast(mask,dtype=tf.float32)
 
             return mask * inputs
-            # indices_greater_than = tf.greater(uniform_random_number,self.rate,name = 'stoppedGradientLocations')
-            # indices_greater_than = tf.cast(indices_greater_than,dtype=tf.float32)
-            # inputs_copy = tf.identity(inputs)
-            # out1 = tf.stop_gradient(inputs_copy*indices_greater_than)
-            # indices_less_than= 1 - indices_greater_than
-            # out2 = inputs*indices_less_than
-            # out_total = out1 + out2
         else:
             return inputs * (1-self.rate)
 
@@ -52,9 +46,9 @@ class FFNet(keras.Model):
             tf.logging.info("Using Sigmoid Activation")
             activation = tf.nn.sigmoid
 
-        for unit in hparams.hidden_units:
-            self.feed_forward.append(keras.layers.Dense(units=unit,activation=activation))
-
+        for i, unit in enumerate(hparams.hidden_units):
+            self.feed_forward.append(keras.layers.Dense(units=unit,
+                activation=activation, name='ff{}'.format(i)))
 
         self.dropouts = []
         if hparams.drop_type == VANILLA:
@@ -66,25 +60,16 @@ class FFNet(keras.Model):
             for d_prob in hparams.dropouts:
                 self.dropouts.append(keras.layers.Dropout(rate=d_prob))
 
-        self.postprocess = keras.layers.Dense(units=hparams.classes, activation=activation)
-
-        # feed_forward = keras.models.Sequential()
-        # training = (mode == tf.estimator.ModeKeys.TRAIN) or hparams.type == SAMPLE
-        # for unit, d_prob in zip(hparams.hidden_units, hparams.dropouts):
-        #     feed_forward.add(keras.layers.Dense(units=unit,activation=hparams.activation))
-        #     feed_forward.add(tf.layers.dropout())
-        #     # if mode == tf.estimator.ModeKeys.TRAIN or hparams.type == SAMPLE:
-        #     #     feed_forward.add(keras.layers.Dropout(d_prob))
-        # feed_forward.add(keras.layers.Dense(units=hparams.classes, activation=hparams.activation))
-        # self.feed_forward = feed_forward
+        self.feed_forward.append(keras.layers.Dense(units=hparams.classes,
+            activation=activation, name='ff{}'.format(len(hparams.hidden_units))))
 
     def predict(self, inputs, training, scale_down):
         result = inputs
-        for unit, dropout in zip(self.feed_forward, self.dropouts):
+        for unit, dropout in zip(self.feed_forward[:-1], self.dropouts):
             result = dropout(unit(result), training=training)
             if scale_down:
                 result = result * (1 - dropout.rate)
-        result = self.postprocess(result)
+        result = self.feed_forward[-1](result)
         return result
 
     def call(self, inputs):
@@ -100,31 +85,6 @@ class FFNet(keras.Model):
             combined = tf.stack(outputs, axis=-1)
             return combined
 
-        # if self.mode == tf.estimator.ModeKeys.TRAIN or self.type == NORMAL:
-        #     logits = self.feed_forward(inputs)
-        #     return logits
-        # else:
-        #
-        #     outputs = []
-        #     for _ in range(self.samples):
-        #         logits = self.feed_forward(inputs)
-        #         outputs.append(logits)
-        #     combined = tf.stack(outputs, axis=-1)
-        #     return combined
-
-    @classmethod
-    def get_tiny_hparams(cls):
-        hparams = tf.contrib.training.HParams(
-            samples=30,
-            hidden_units=[20, 10, 10],
-            dropouts=[0.5, 0, 0],
-            activation='tanh',
-            classes = 10,
-            type=SAMPLE,
-            drop_type=VANILLA,
-        )
-        return hparams
-
     @classmethod
     def get_base_hparams(cls):
         hparams = tf.contrib.training.HParams(
@@ -135,6 +95,7 @@ class FFNet(keras.Model):
             classes = 10,
             type=SAMPLE,
             drop_type=VANILLA,
+            cluster_layer=0,
         )
         return hparams
 
@@ -175,21 +136,12 @@ def model_fn(features, labels, mode, params):
       predictions = model(features)
 
       logits_sample = tf.math.reduce_mean(predictions, axis=-1)
-      mean_std = tf.math.reduce_mean(tf.math.reduce_std(tf.nn.l2_normalize(predictions, axis=-1), axis=-1))
+      mean_std = tf.math.reduce_mean(tf.math.reduce_std(predictions, axis=-1))
       std_hook = tf.train.LoggingTensorHook(
         tensors={"mean_std": mean_std},
         every_n_iter=100
       )
       eval_hooks.append(std_hook)
-      with tf.variable_scope("metrics"):
-          eval_metric_ops = {
-            "norm_accuracy": tf.metrics.accuracy(
-                labels=tf.argmax(labels, axis=-1),
-                predictions=tf.argmax(input=logits_norm, axis=-1)),
-            "sample_accuracy": tf.metrics.accuracy(
-                labels=tf.argmax(labels, axis=-1),
-                predictions=tf.argmax(input=logits_sample, axis=-1))
-          }
 
       model.type = params.type
 
@@ -217,6 +169,18 @@ def model_fn(features, labels, mode, params):
           )
           eval_hooks.append(loss_sample_hook)
 
+      with tf.variable_scope("metrics"):
+          eval_metric_ops = {
+            "norm_accuracy": tf.metrics.accuracy(
+                labels=tf.argmax(labels, axis=-1),
+                predictions=tf.argmax(input=logits_norm, axis=-1)),
+            "sample_accuracy": tf.metrics.accuracy(
+                labels=tf.argmax(labels, axis=-1),
+                predictions=tf.argmax(input=logits_sample, axis=-1)),
+            "sample_std": tf.metrics.mean(tf.math.reduce_std(predictions, axis=-1)),
+            "norm_loss": tf.metrics.mean(loss_norm),
+            "sample_loss": tf.metrics.mean(loss_sample)
+          }
 
       return tf.estimator.EstimatorSpec(
         mode=mode,

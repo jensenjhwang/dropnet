@@ -5,8 +5,11 @@ import logging
 import os
 import sys
 from trainer.preprocess import load_data, _input_fn
+from trainer.util import find_best_clustering, rand_index, match_proportion, adjusted_rand_index
+from trainer.logging_util import append_spread_sheet
 
 import tensorflow as tf
+import numpy as np
 
 # Add `Dropnet` package.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -79,35 +82,22 @@ def parse_args():
     default=200,
   )
 
-  ### Model HParams
   parser.add_argument(
-    '--learning_rate',
-    type=float,
-  )
-  parser.add_argument(
-    '--decay_rate',
-    type=float,
-  )
-  parser.add_argument(
-    '--samples',
+    '--clusters',
     type=int,
+    default=None,
   )
+
   parser.add_argument(
-    '--hidden_units',
-    nargs='+',
-    type=int,
-  )
-  parser.add_argument(
-    '--dropouts',
-    type=float,
-  )
-  parser.add_argument(
-    '--activation',
+    '--spreadsheet_id',
     type=str,
+    default='15li_sYrdZkyIpAHc404P8u3lLV6uj-Zjxyk--_V_ALA',
   )
+
   parser.add_argument(
-    '--type',
+    '--credentials_dir',
     type=str,
+    default='',
   )
 
   args, _ = parser.parse_known_args()
@@ -193,7 +183,58 @@ def main():
     throttle_secs=5
   )
 
-  tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+  metrics_0 = tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+  tf.logging.info("train_and_evaluate: {}".format(metrics_0))
+
+  metrics = estimator.evaluate(eval_input, steps=args.eval_steps)
+  tf.logging.info("evaluate: {}".format(metrics))
+
+  weight = estimator.get_variable_value('ff_net/ff' + str(hparams.cluster_layer) + '/kernel').T
+  weight_dense = estimator.get_variable_value('ff_net/ff' + str(hparams.cluster_layer+1) + '/kernel')
+  score, cluster1 = find_best_clustering(weight, clusters=args.clusters)
+  score_next, cluster2 = find_best_clustering(weight_dense, clusters=args.clusters)
+  score_scaled = score / np.sqrt(weight.shape[1])
+  score_next_scaled = score_next / np.sqrt(weight_dense.shape[1])
+
+  weight_mean = np.mean(np.abs(weight), axis=0)
+  weight_next_mean = np.mean(np.abs(weight_dense), axis=0)
+
+  r_index = rand_index(cluster1, cluster2)
+  ar_index = adjusted_rand_index(cluster1, cluster2)
+  match_prop = match_proportion(cluster1, cluster2)
+
+  tf.logging.info("Cluster Score: {}".format(score))
+  tf.logging.info("Cluster Score (scaled by dim): {}".format(score_scaled))
+  tf.logging.info("Weight Mean Vector: {}".format(weight_mean))
+  tf.logging.info("Next Cluster Score: {}".format(score_next))
+  tf.logging.info("Next Cluster Score (scaled by dim): {}".format(score_next_scaled))
+  tf.logging.info("Next Weight Mean Vector: {}".format(weight_next_mean))
+  tf.logging.info("Cluster Matrix: {}".format(weight))
+  tf.logging.info("Cluster Next Matrix: {}".format(weight_dense))
+  tf.logging.info("Rand Index: {}".format(r_index))
+  tf.logging.info("Adjusted Rand Index: {}".format(ar_index))
+  tf.logging.info("Match Proportion: {}".format(match_prop))
+
+  # Google Spreadsheet
+  if args.spreadsheet_id is not None:
+      norm_loss = metrics['norm_loss']
+      sample_loss = metrics['sample_loss']
+      norm_accuracy = metrics['norm_accuracy']
+      sample_accuracy = metrics['sample_accuracy']
+      sample_std = metrics['sample_std']
+
+      record = [args.job_dir, args.batch_size, args.train_steps]
+      hparams_name = ['samples', 'hidden_units', 'dropouts', 'activation', 'classes', 'type', 'drop_type', 'cluster_layer'
+        , 'learning_rate', 'decay_step', 'decay_rate']
+      for name in hparams_name:
+          record.append(hparams.get(name))
+
+      record += [norm_loss, sample_loss, norm_accuracy, sample_accuracy,
+        sample_std, score, score_scaled, score_next, score_next_scaled,
+        r_index, ar_index, match_prop, weight_mean, weight_next_mean,
+        weight, weight_dense]
+      append_spread_sheet(args.spreadsheet_id, record, args.credentials_dir, args.cloud_train)
+
 
 
 if __name__ == "__main__":

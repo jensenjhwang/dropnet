@@ -19,10 +19,13 @@ gcloud ml-engine jobs submit training $JOB_NAME \
     --package-path trainer/ \
     --config cloud/config_gpu.yaml \
     -- \
-    --train_steps=20000 \
-    --batch_size=16 \
-    --hparams="hidden_units=[100, 500, 100],
-      dropouts=[0., 0.5, 0.],
+    --train_steps=2500 \
+    --batch_size=128 \
+    --credentials_dir="gs://dropnet" \
+    --cloud_train \
+    --hparams="hidden_units=[100, 100, 100],
+      dropouts=[0.8, 0., 0.],
       samples=200,
-      drop_type=VANILLA,
-      activation=tanh" \
+      drop_type=INVERTED,
+      activation=tanh,
+      cluster_layer=0"
