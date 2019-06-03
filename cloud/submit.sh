@@ -26,6 +26,6 @@ gcloud ml-engine jobs submit training $JOB_NAME \
     --hparams="hidden_units=[100, 100, 100],
       dropouts=[0.8, 0., 0.],
       samples=200,
-      drop_type=INVERTED,
+      drop_type=VANILLA,
       activation=tanh,
       cluster_layer=0"
